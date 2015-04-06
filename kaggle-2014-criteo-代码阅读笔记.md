@@ -43,6 +43,7 @@ read_dense函数和read_sparse函数的具体解释请参考gbdt的README doc。
 
 GBDT首先需要指定树的个数: "GBDT gbdt(opt.nr_tree)"，然后调用"GBDT::fit(Problem const &Tr, Problem const &Va)"开始训练。
 
+在代码里写了一些注释，已上传到github。具体请参考[kaggle-2014-criteo my notes](https://github.com/zzbased/kaggle-2014-criteo)
 
 ## 编程技巧
 
