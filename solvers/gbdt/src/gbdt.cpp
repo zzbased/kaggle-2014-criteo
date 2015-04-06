@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <thread>
 #include <omp.h>
+#include <iostream>
 
 #include "gbdt.h"
 #include "timer.h"
@@ -71,8 +72,8 @@ void scan(
             {
                 double const sr = meta.s - meta.sl;
                 uint32_t const nr = meta.n - meta.nl;
-                double const current_ese = 
-                    (meta.sl*meta.sl)/static_cast<double>(meta.nl) + 
+                double const current_ese =
+                    (meta.sl*meta.sl)/static_cast<double>(meta.nl) +
                     (sr*sr)/static_cast<double>(nr);
 
                 Defender &defender = defenders[f*nr_field+j];
@@ -123,11 +124,11 @@ void scan_sparse(
             Meta const &meta = metas[f];
             if(meta.nl == 0)
                 continue;
-            
+
             double const sr = meta.s - meta.sl;
             uint32_t const nr = meta.n - meta.nl;
-            double const current_ese = 
-                (meta.sl*meta.sl)/static_cast<double>(meta.nl) + 
+            double const current_ese =
+                (meta.sl*meta.sl)/static_cast<double>(meta.nl) +
                 (sr*sr)/static_cast<double>(nr);
 
             Defender &defender = defenders[f*nr_sparse_field+j];
@@ -148,7 +149,7 @@ uint32_t CART::max_tnodes = static_cast<uint32_t>(pow(2, CART::max_depth+1));
 std::mutex CART::mtx;
 bool CART::verbose = false;
 
-void CART::fit(Problem const &prob, std::vector<float> const &R, 
+void CART::fit(Problem const &prob, std::vector<float> const &R,
     std::vector<float> &F1)
 {
     uint32_t const nr_field = prob.nr_field;
@@ -247,16 +248,16 @@ void CART::fit(Problem const &prob, std::vector<float> const &R,
             else if(static_cast<uint32_t>(tnode.feature) < nr_field)
             {
                 if(prob.Z[tnode.feature][i].v < tnode.threshold)
-                    tnode_idx = 2*tnode_idx; 
+                    tnode_idx = 2*tnode_idx;
                 else
-                    tnode_idx = 2*tnode_idx+1; 
+                    tnode_idx = 2*tnode_idx+1;
             }
             else
             {
-                uint32_t const target_feature 
+                uint32_t const target_feature
                     = static_cast<uint32_t>(tnode.feature-nr_field);
                 bool is_one = false;
-                for(uint64_t p = prob.SJP[i]; p < prob.SJP[i+1]; ++p) 
+                for(uint64_t p = prob.SJP[i]; p < prob.SJP[i+1]; ++p)
                 {
                     if(prob.SJ[p] == target_feature)
                     {
@@ -265,14 +266,14 @@ void CART::fit(Problem const &prob, std::vector<float> const &R,
                     }
                 }
                 if(!is_one)
-                    tnode_idx = 2*tnode_idx; 
+                    tnode_idx = 2*tnode_idx;
                 else
-                    tnode_idx = 2*tnode_idx+1; 
+                    tnode_idx = 2*tnode_idx+1;
             }
         }
     }
 
-    std::vector<std::pair<double, double>> 
+    std::vector<std::pair<double, double>>
         tmp(max_tnodes, std::make_pair(0, 0));
     for(uint32_t i = 0; i < nr_instance; ++i)
     {
@@ -320,28 +321,31 @@ void GBDT::fit(Problem const &Tr, Problem const &Va)
 
     Timer timer;
     printf("iter     time    tr_loss    va_loss\n");
+    // 感觉这里使用的是 logloss，即logit boost算法。
+    // 整体算法取自 The Elements of Statistical Learning Algorithm 10.3
     for(uint32_t t = 0; t < trees.size(); ++t)
     {
         timer.tic();
 
         std::vector<float> const &Y = Tr.Y;
         std::vector<float> R(Tr.nr_instance), F1(Tr.nr_instance);
-
+        // 计算残差，也就是loss function的梯度下降
         #pragma omp parallel for schedule(static)
-        for(uint32_t i = 0; i < Tr.nr_instance; ++i) 
+        for(uint32_t i = 0; i < Tr.nr_instance; ++i)
             R[i] = static_cast<float>(Y[i]/(1+exp(Y[i]*F_Tr[i])));
-
+        // regression tree，去fit targets R[i]
         trees[t].fit(Tr, R, F1);
-
+        // 计算整体的loss，并累加F_Tr(sum{y})
+        // 可以看到，这里没有使用权重alpha，也就是没有使用bootstrap re-sample
         double Tr_loss = 0;
         #pragma omp parallel for schedule(static) reduction(+: Tr_loss)
-        for(uint32_t i = 0; i < Tr.nr_instance; ++i) 
+        for(uint32_t i = 0; i < Tr.nr_instance; ++i)
         {
             F_Tr[i] += F1[i];
             Tr_loss += log(1+exp(-Y[i]*F_Tr[i]));
         }
         Tr_loss /= static_cast<double>(Tr.nr_instance);
-
+        // 计算validation loss
         #pragma omp parallel for schedule(static)
         for(uint32_t i = 0; i < Va.nr_instance; ++i)
         {
@@ -351,7 +355,7 @@ void GBDT::fit(Problem const &Tr, Problem const &Va)
 
         double Va_loss = 0;
         #pragma omp parallel for schedule(static) reduction(+: Va_loss)
-        for(uint32_t i = 0; i < Va.nr_instance; ++i) 
+        for(uint32_t i = 0; i < Va.nr_instance; ++i)
             Va_loss += log(1+exp(-Va.Y[i]*F_Va[i]));
         Va_loss /= static_cast<double>(Va.nr_instance);
 
@@ -363,8 +367,12 @@ void GBDT::fit(Problem const &Tr, Problem const &Va)
 float GBDT::predict(float const * const x) const
 {
     float s = bias;
-    for(auto &tree : trees)
-        s += tree.predict(x).second;
+    for(auto &tree : trees) {
+        float pred = tree.predict(x).second;
+        std::cout << pred << " ";
+        s += pred;
+    }
+    std::cout << s << std::endl;
     return s;
 }
 

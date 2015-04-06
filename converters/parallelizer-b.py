@@ -5,7 +5,7 @@ import argparse, sys
 from common import *
 
 def parse_args():
-    
+
     if len(sys.argv) == 1:
         sys.argv.append('-h')
 
@@ -20,11 +20,11 @@ def parse_args():
     return args
 
 def main():
-    
+
     args = parse_args()
 
     nr_thread = args['nr_thread']
-    
+
     split(args['src1_path'], nr_thread, True)
 
     split(args['src2_path'], nr_thread, False)

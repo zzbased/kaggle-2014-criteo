@@ -32,7 +32,7 @@ Option parse_option(std::vector<std::string> const &args)
     if(argc == 0)
         throw std::invalid_argument(train_help());
 
-    Option opt; 
+    Option opt;
 
     uint32_t i = 0;
     for(; i < argc; ++i)
@@ -84,6 +84,8 @@ void write(Problem const &prob, GBDT const &gbdt, std::string const &path)
         std::vector<uint32_t> indices = gbdt.get_indices(x.data());
 
         fprintf(f, "%d", static_cast<int>(prob.Y[i]));
+        // 输出预测结果
+        fprintf(f, " %f", gbdt.predict(x.data()));
         for(uint32_t t = 0; t < indices.size(); ++t)
             fprintf(f, " %d", indices[t]);
         fprintf(f, "\n");
@@ -109,7 +111,9 @@ int main(int const argc, char const * const * const argv)
 
     std::cout << "reading data..." << std::flush;
     Problem const Tr = read_data(opt.Tr_path, opt.TrS_path);
+    // Tr.Print();
     Problem const Va = read_data(opt.Va_path, opt.VaS_path);
+    Va.Print();
     std::cout << "done\n" << std::flush;
 
 	omp_set_num_threads(static_cast<int>(opt.nr_thread));

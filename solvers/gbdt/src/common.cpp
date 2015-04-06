@@ -97,7 +97,7 @@ void read_sparse(Problem &prob, std::string const &path)
 
     std::vector<std::vector<uint32_t>> buffer;
 
-    uint64_t nnz = 0; 
+    uint64_t nnz = 0;
     uint32_t nr_instance = 0;
     prob.SJP.push_back(0);
     for(; fgets(line, kMaxLineSize, f) != nullptr; ++nr_instance)
@@ -117,18 +117,18 @@ void read_sparse(Problem &prob, std::string const &path)
         }
         prob.SJP.push_back(prob.SJ.size());
     }
-    prob.SJ.shrink_to_fit();
-    prob.SJP.shrink_to_fit();
+    prob.SJ.shrink_to_fit();    // 存储所有instance的feature
+    prob.SJP.shrink_to_fit();   // 存储instance之间的分隔position
 
     prob.nr_sparse_field = static_cast<uint32_t>(buffer.size());
-    prob.SI.resize(nnz);
-    prob.SIP.resize(prob.nr_sparse_field+1);
+    prob.SI.resize(nnz);    // 是SJ的逆序。SJ是按照instance在遍历，而SI是按照feature在遍历。
+    prob.SIP.resize(prob.nr_sparse_field+1);    // SI-feature之间的分隔position
     prob.SIP[0] = 0;
 
     uint64_t p = 0;
     for(uint32_t j = 0; j < prob.nr_sparse_field; ++j)
     {
-        for(auto i : buffer[j]) 
+        for(auto i : buffer[j])
             prob.SI[p++] = i;
         prob.SIP[j+1] = p;
     }
@@ -142,6 +142,7 @@ void read_sparse(Problem &prob, std::string const &path)
 
 Problem read_data(std::string const &dense_path, std::string const &sparse_path)
 {
+    // nr_field = 13
     Problem prob(get_nr_line(dense_path), get_nr_field(dense_path));
 
     read_dense(prob, dense_path);
@@ -159,7 +160,7 @@ FILE *open_c_file(std::string const &path, std::string const &mode)
     return f;
 }
 
-std::vector<std::string> 
+std::vector<std::string>
 argv_to_args(int const argc, char const * const * const argv)
 {
     std::vector<std::string> args;
